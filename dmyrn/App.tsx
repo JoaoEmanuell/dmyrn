@@ -1,118 +1,97 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+/* eslint-disable react-native/no-inline-styles */
+/* eslint-disable semi */
+/* eslint-disable react/react-in-jsx-scope */
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { useState, useEffect } from 'react'
+import { ScrollView, TextInput, View, Text } from 'react-native'
+import { Bar, Circle } from 'react-native-progress'
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+import GrayButton from './components/ui/GrayButton'
+import Dropdown from './components/ui/Dropdown'
+import { getRandomElementKey } from './src/randomElementKey'
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+export default function App() {
+    const [input, onChangeInput] = useState('')
+    const [progressBar, setProgressBar] = useState<JSX.Element | null>(null)
+    const [outputText, setOutputText] = useState('')
+    const [selectedItem, setSelected] = useState<'360' | '720' | ''>('')
+    const [formatSelected, setFormatSelected] = useState<'mp3' | 'mp4'>('mp3')
+    const [dropdown, setDropdown] = useState<JSX.Element | null>(null)
+    const [mp3ButtonColor, setMp3ButtonColor] = useState<'' | 'bg-gray-500'>('')
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
+    const data = [
+        { key: '360', value: '360p' },
+        { key: '720', value: '720p' },
+    ]
+
+    const pressDownloadButton = () => {
+        console.log(input)
+        console.log(selectedItem)
+        console.log(formatSelected)
+    }
+
+    const onPressMp3Button = () => {
+        setFormatSelected('mp3')
+        setDropdown(getDropdown)
+        setMp3ButtonColor('bg-gray-500')
+    }
+
+    const getDropdown = () => {
+        return (
+            <Dropdown
+                setSelected={(val) => setSelected(val)}
+                data={data}
+                onSelect={() => {
+                    setFormatSelected('mp4')
+                    setMp3ButtonColor('')
+                }}
+                placeholder="MP4"
+                key={getRandomElementKey()}
+            />
+        )
+    }
+
+    useEffect(() => {
+        setDropdown(getDropdown())
+    }, [])
+
+    return (
+        <ScrollView className="bg-white">
+            <View>
+                <TextInput
+                    placeholder="Link do vídeo ou playlist"
+                    placeholderTextColor={'black'}
+                    className="text-center text-black p-4 m-4 bg-gray-200 rounded-lg"
+                    value={input}
+                    onChangeText={onChangeInput}
+                />
+            </View>
+            <View
+                style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                }}
+                className="self-center"
+            >
+                <GrayButton
+                    onPress={onPressMp3Button}
+                    text="MP3"
+                    pressableClassName={`w-20 mr-4 ${mp3ButtonColor}`}
+                />
+                {dropdown}
+            </View>
+            <View className="mt-4">
+                <GrayButton
+                    onPress={pressDownloadButton}
+                    text="Baixar música ou playlist"
+                    pressableClassName="mx-12"
+                />
+            </View>
+            <View className="mt-4">
+                <Text className="text-black text-center">{outputText}</Text>
+            </View>
+            <View className="mt-4">{progressBar}</View>
+        </ScrollView>
+    )
 }
-
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
-
-export default App;
