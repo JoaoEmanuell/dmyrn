@@ -6,13 +6,16 @@
 import { useState, useEffect } from 'react'
 import { ScrollView, TextInput, View, Text } from 'react-native'
 import { Bar, Circle } from 'react-native-progress'
+import { UrlValidator } from './src/urlValidator/urlValidator'
 
 import GrayButton from './components/ui/GrayButton'
 import Dropdown from './components/ui/Dropdown'
-import { getRandomElementKey } from './src/randomElementKey'
+import { getRandomElementKey } from './src/lib/randomElementKey'
 
 export default function App() {
-    const [input, onChangeInput] = useState('')
+    const [input, onChangeInput] = useState(
+        'https://youtu.be/example?si=example'
+    )
     const [progressBar, setProgressBar] = useState<JSX.Element | null>(null)
     const [outputText, setOutputText] = useState('')
     const [selectedItem, setSelected] = useState<'360' | '720' | ''>('')
@@ -26,9 +29,17 @@ export default function App() {
     ]
 
     const pressDownloadButton = () => {
-        console.log(input)
         console.log(selectedItem)
         console.log(formatSelected)
+        console.log(input)
+
+        const urlValidator = UrlValidator(input)
+
+        if (urlValidator.status) {
+            setOutputText('Url válida!')
+        } else {
+            setOutputText('Url inválida!')
+        }
     }
 
     const onPressMp3Button = () => {

@@ -130,3 +130,5 @@ dist
 .pnp.*
 
 __tests__/
+tmp.*
+tmp/
