@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-native/no-inline-styles */
 /* eslint-disable semi */
 /* eslint-disable react/react-in-jsx-scope */
@@ -46,6 +47,7 @@ export default function App() {
                     setMp3ButtonColor('')
                 }}
                 placeholder="MP4"
+                search={false}
                 key={getRandomElementKey()}
             />
         )

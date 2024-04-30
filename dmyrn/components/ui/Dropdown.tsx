@@ -7,6 +7,7 @@ interface DropdownInterface {
     placeholder: string
     onSelect: () => void
     data: { key: string; value: string }[]
+    search?: boolean
 }
 
 export default function Dropdown(props: DropdownInterface) {
@@ -19,6 +20,7 @@ export default function Dropdown(props: DropdownInterface) {
             inputStyles={{ color: 'black' }}
             dropdownTextStyles={{ color: 'black' }}
             placeholder={props.placeholder}
+            search={props.search}
         />
     )
 }
