@@ -11,10 +11,6 @@ import { UrlValidator } from './src/urlValidator/urlValidator'
 import GrayButton from './components/ui/GrayButton'
 import Dropdown from './components/ui/Dropdown'
 import { getRandomElementKey } from './src/lib/randomElementKey'
-import { videoFormats } from './src/interfaces/types'
-import { RemoteDownloadApi } from './src/apis/remoteDownloadApi/remoteDownloadApi'
-
-import { requestAndroidPermissions } from './src/lib/androidPermissions'
 
 export default function App() {
     const [input, onChangeInput] = useState(
@@ -22,15 +18,10 @@ export default function App() {
     )
     const [progressBar, setProgressBar] = useState<JSX.Element | null>(null)
     const [outputText, setOutputText] = useState('')
-    const [selectedItem, setSelected] = useState<videoFormats>('')
+    const [selectedItem, setSelected] = useState<'360' | '720' | ''>('')
     const [formatSelected, setFormatSelected] = useState<'mp3' | 'mp4'>('mp3')
     const [dropdown, setDropdown] = useState<JSX.Element | null>(null)
     const [mp3ButtonColor, setMp3ButtonColor] = useState<'' | 'bg-gray-500'>('')
-    const [remoteDownload, setRemoteDownload] =
-        useState<RemoteDownloadApi | null>(null)
-    const [downloadButtonText, setDownloadButtonText] = useState<
-        'Baixar música ou playlist' | 'Parar download'
-    >('Baixar música ou playlist')
 
     const data = [
         { key: '360', value: '360p' },
@@ -38,10 +29,16 @@ export default function App() {
     ]
 
     const pressDownloadButton = () => {
-        if (downloadButtonText === 'Baixar música ou playlist') {
-            startDownload()
-        } else if (downloadButtonText === 'Parar download') {
-            stopDownload()
+        console.log(selectedItem)
+        console.log(formatSelected)
+        console.log(input)
+
+        const urlValidator = UrlValidator(input)
+
+        if (urlValidator.status) {
+            setOutputText('Url válida!')
+        } else {
+            setOutputText('Url inválida!')
         }
     }
 
@@ -67,51 +64,7 @@ export default function App() {
         )
     }
 
-    const startDownload = async () => {
-        const urlValidator = UrlValidator(input)
-
-        if (urlValidator.status) {
-            const remoteDownload = new RemoteDownloadApi(
-                input,
-                formatSelected,
-                selectedItem,
-                urlValidator.type,
-                setOutputText,
-                progressBarManager
-            )
-            setRemoteDownload(remoteDownload)
-            setDownloadButtonText('Parar download')
-            await remoteDownload.download()
-        } else {
-            setOutputText('Url inválida!')
-        }
-    }
-
-    const stopDownload = () => {
-        remoteDownload.stopDownload()
-        setDownloadButtonText('Baixar música ou playlist')
-        setOutputText('Download cancelado')
-        setProgressBar(null)
-    }
-
-    const progressBarManager = (percent?: number, infinite?: boolean) => {
-        if (percent === 1) {
-            // full progress bar
-            setProgressBar(null)
-            setDownloadButtonText('Baixar música ou playlist')
-        } else if (infinite) {
-            setProgressBar(
-                <Circle size={80} indeterminate className="self-center" />
-            )
-        } else {
-            setProgressBar(
-                <Bar progress={percent} width={200} className="self-center" />
-            )
-        }
-    }
-
     useEffect(() => {
-        requestAndroidPermissions().then((_) => {})
         setDropdown(getDropdown())
     }, [])
 
@@ -144,16 +97,14 @@ export default function App() {
             <View className="mt-4">
                 <GrayButton
                     onPress={pressDownloadButton}
-                    text={downloadButtonText}
+                    text="Baixar música ou playlist"
                     pressableClassName="mx-12"
                 />
             </View>
             <View className="mt-4">
-                <Text className="text-black text-center px-4">
-                    {outputText}
-                </Text>
+                <Text className="text-black text-center">{outputText}</Text>
             </View>
-            <View className="mt-4 flex justify-center">{progressBar}</View>
+            <View className="mt-4">{progressBar}</View>
         </ScrollView>
     )
 }

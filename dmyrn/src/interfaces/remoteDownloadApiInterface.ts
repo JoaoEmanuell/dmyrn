@@ -9,5 +9,4 @@ export interface remoteDownloadApiInterface {
     download: () => Promise<boolean> // true in end, false if error
     setOutputText: Dispatch<SetStateAction<string>> // used to send messages to interface
     progressBarManager: (percent?: number, infinite?: boolean) => void // used to manage the progress bar
-    stopDownload: () => boolean // true if success, false if error
 }
