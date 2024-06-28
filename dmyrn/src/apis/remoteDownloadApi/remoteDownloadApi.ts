@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-shadow */
-import axios, { Axios } from 'axios'
+import axios, { Axios, AxiosResponse } from 'axios'
 import { remoteDownloadApiInterface } from '../../interfaces/remoteDownloadApiInterface'
 import {
     videoContentRemoteApiReturn,
@@ -7,25 +7,30 @@ import {
 } from '../../interfaces/types'
 import { Dispatch, SetStateAction } from 'react'
 import { RNFS, savePath } from '../../lib/rnfs'
+import { secureFilename } from '../../utils/secureFilename'
+import { Mp3Api } from '../mp3Api/mp3Api'
 
 export class RemoteDownloadApi implements remoteDownloadApiInterface {
     url: string
     format: 'mp3' | 'mp4'
     videoFormats: videoFormats
-    setOutputText: Dispatch<SetStateAction<string>>
     typeOfContent: 'video' | 'playlist'
+    mp3Api: Mp3Api
+    setOutputText: Dispatch<SetStateAction<string>>
     progressBarManager: (percent?: number, infinite?: boolean) => void
     private jobId: number
     private playlistVideos: string[]
     private playlistDownload: boolean
+    private retry: number
 
-    axiosConfig: Axios
+    private axiosConfig: Axios
 
     constructor(
         url: string,
         formats: 'mp3' | 'mp4',
         videoFormats: videoFormats,
         typeOfContent: 'video' | 'playlist',
+        mp3Api: Mp3Api,
         setOutputText: Dispatch<SetStateAction<string>>,
         progressBarManager: (percent?: number, infinite?: boolean) => void
     ) {
@@ -38,9 +43,11 @@ export class RemoteDownloadApi implements remoteDownloadApiInterface {
         this.progressBarManager = progressBarManager
         this.playlistVideos = []
         this.playlistDownload = false
+        this.retry = 0
+        this.mp3Api = mp3Api
 
         this.axiosConfig = axios.create({
-            baseURL: 'http://192.168.0.110:8080/api',
+            baseURL: 'http://192.168.0.110:8080/api', //'https://ytdlpapi-8be5em2b.b4a.run/api',
             timeout: 20000, // 20 seconds
         })
     }
@@ -74,7 +81,7 @@ export class RemoteDownloadApi implements remoteDownloadApiInterface {
     private async downloadPlaylist() {
         this.setOutputText('Coletando informações da playlist!')
         this.progressBarManager(0, true)
-        const playlistInfo = await this.axiosConfig.post('/playlist', {
+        const playlistInfo = await this.axiosConfig.post('/playlist/', {
             url: this.url,
         })
         const data: string[] = playlistInfo.data
@@ -89,10 +96,23 @@ export class RemoteDownloadApi implements remoteDownloadApiInterface {
     private async downloadAudio() {
         this.setOutputText('Coletando informações da música!')
         this.progressBarManager(0, true)
-        const videoInfo = await this.axiosConfig.post('/video', {
-            url: this.url,
-            quality: this.format,
-        })
+        let videoInfo: AxiosResponse<any, any>
+        try {
+            videoInfo = await this.axiosConfig.post('/video/', {
+                url: this.url,
+                quality: this.format,
+            })
+        } catch (err) {
+            if (this.retry <= 5) {
+                console.log(`Retry: ${this.retry}`)
+                this.retry++
+                this.downloadAudio()
+            } else {
+                this.setOutputText('Erro no download')
+                this.stopDownload()
+                this.progressBarManager(1)
+            }
+        }
         const data = videoInfo.data as videoContentRemoteApiReturn
         if (data['headers'] === null) {
             // error in download
@@ -102,7 +122,7 @@ export class RemoteDownloadApi implements remoteDownloadApiInterface {
             this.setOutputText(
                 `Download da música \n"${data.title}"\n iniciado!`
             )
-            this.downloadFile(data)
+            await this.downloadFile(data)
         }
     }
 
@@ -126,8 +146,14 @@ export class RemoteDownloadApi implements remoteDownloadApiInterface {
         }
     }
 
-    private downloadFile(data: videoContentRemoteApiReturn) {
-        const fileWithPath = `${savePath}/${data.title}.${this.format}`
+    private async downloadFile(data: videoContentRemoteApiReturn) {
+        const fileWithPath =
+            '/storage/emulated/0/Download/oh_profundidade__live_.mp3'
+        const convertResult = await this.mp3Api.start(fileWithPath)
+        console.log(convertResult)
+        /*const fileWithPath = `${savePath}/${secureFilename(data.title)}.${
+            this.format
+        }`
 
         try {
             RNFS.unlink(fileWithPath).then(() => {
@@ -137,7 +163,7 @@ export class RemoteDownloadApi implements remoteDownloadApiInterface {
             console.log('file not exists')
         }
 
-        RNFS.downloadFile({
+        await RNFS.downloadFile({
             fromUrl: data.url,
             toFile: fileWithPath,
             headers: data.headers,
@@ -145,29 +171,32 @@ export class RemoteDownloadApi implements remoteDownloadApiInterface {
                 const progress = res.bytesWritten / res.contentLength
                 this.progressBarManager(progress, false)
                 this.setOutputText(`Progress: ${(progress * 100).toFixed(2)}%`)
-                console.log(`Progress: ${(progress * 100).toFixed(2)}%`)
-                console.log(
-                    `ProgressBytes written: ${res.bytesWritten} | contentLength ${res.contentLength}`
-                )
             },
             begin: (res) => {
                 this.jobId = res.jobId
             },
         })
-            .promise.then((response) => {
+            .promise.then(async (response) => {
                 console.log('File downloaded!', response)
-                this.setOutputText('Download concluído')
-                this.jobId = undefined
-                this.downloadNextVideo()
-            })
-            .catch((err) => {
-                console.log('Download error:')
-                console.log(err)
-
-                if (!err.toString().includes('aborted')) {
-                    this.setOutputText('Erro no download!')
+                if (response['statusCode'] !== 403) {
+                    this.setOutputText('Download concluído')
+                    this.jobId = undefined
+                    const convertResult = await this.mp3Api.start(fileWithPath)
+                    console.log(convertResult)
+                    this.downloadNextVideo()
+                } else {
+                    this.download()
+                    this.retry = 0
                 }
             })
+            .catch((err) => {
+                if (!err.toString().includes('aborted')) {
+                    console.log('Download error:')
+                    console.log(err)
+                    this.setOutputText('Erro no download!')
+                    this.progressBarManager(1)
+                }
+            })*/
     }
 
     private downloadNextVideo = () => {

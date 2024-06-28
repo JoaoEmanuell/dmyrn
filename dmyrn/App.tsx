@@ -15,6 +15,7 @@ import { videoFormats } from './src/interfaces/types'
 import { RemoteDownloadApi } from './src/apis/remoteDownloadApi/remoteDownloadApi'
 
 import { requestAndroidPermissions } from './src/lib/androidPermissions'
+import { Mp3Api } from './src/apis/mp3Api/mp3Api'
 
 export default function App() {
     const [input, onChangeInput] = useState(
@@ -71,11 +72,13 @@ export default function App() {
         const urlValidator = UrlValidator(input)
 
         if (urlValidator.status) {
+            const mp3Api = new Mp3Api(setOutputText, progressBarManager)
             const remoteDownload = new RemoteDownloadApi(
                 input,
                 formatSelected,
                 selectedItem,
                 urlValidator.type,
+                mp3Api,
                 setOutputText,
                 progressBarManager
             )

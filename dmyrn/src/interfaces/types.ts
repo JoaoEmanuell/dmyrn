@@ -4,3 +4,13 @@ export type videoContentRemoteApiReturn = {
     url: string
     title: string
 }
+export type mp3ApiStatusType = {
+    status: boolean
+    current: number | undefined
+    filename: string | undefined
+    total: number | undefined
+}
+export type mp3ApiConverteds = {
+    audio: string
+    filename: string
+}
