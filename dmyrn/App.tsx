@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-native/no-inline-styles */
 /* eslint-disable semi */
@@ -11,6 +12,8 @@ import { UrlValidator } from './src/urlValidator/urlValidator'
 import GrayButton from './components/ui/GrayButton'
 import Dropdown from './components/ui/Dropdown'
 import { getRandomElementKey } from './src/lib/randomElementKey'
+import { ytdlDownload } from './src/download/ytdlDownloader'
+import { requestAndroidPermissions } from './src/lib/androidPermissions'
 
 export default function App() {
     const [input, onChangeInput] = useState(
@@ -22,13 +25,15 @@ export default function App() {
     const [formatSelected, setFormatSelected] = useState<'mp3' | 'mp4'>('mp3')
     const [dropdown, setDropdown] = useState<JSX.Element | null>(null)
     const [mp3ButtonColor, setMp3ButtonColor] = useState<'' | 'bg-gray-500'>('')
+    const [downloadStatus, setDownloadStatus] = useState(true) // if true download is allowed, else stop the download
+    const [ytdlInstance, setYtdlInstance] = useState<undefined | ytdlDownload>()
 
     const data = [
         { key: '360', value: '360p' },
         { key: '720', value: '720p' },
     ]
 
-    const pressDownloadButton = () => {
+    const pressDownloadButton = async () => {
         console.log(selectedItem)
         console.log(formatSelected)
         console.log(input)
@@ -36,7 +41,21 @@ export default function App() {
         const urlValidator = UrlValidator(input)
 
         if (urlValidator.status) {
-            setOutputText('Url válida!')
+            if (downloadStatus) {
+                let selectedQuality
+                if (formatSelected === 'mp3') {
+                    selectedQuality = formatSelected
+                } else {
+                    selectedQuality = selectedItem
+                }
+                const ytdlDownloadInstance = new ytdlDownload(
+                    input,
+                    selectedQuality,
+                    setProgressBarValue,
+                    setOutputText
+                )
+                await ytdlDownloadInstance.download()
+            }
         } else {
             setOutputText('Url inválida!')
         }
@@ -64,7 +83,21 @@ export default function App() {
         )
     }
 
+    const setProgressBarValue = (
+        progress: number,
+        infinite: boolean = false
+    ) => {
+        if (infinite) {
+            setProgressBar(<Circle size={30} indeterminate />)
+        } else if (progress === -1) {
+            setProgressBar(undefined)
+        } else {
+            setProgressBar(<Bar progress={progress} width={200} />)
+        }
+    }
+
     useEffect(() => {
+        requestAndroidPermissions()
         setDropdown(getDropdown())
     }, [])
 
@@ -104,7 +137,16 @@ export default function App() {
             <View className="mt-4">
                 <Text className="text-black text-center">{outputText}</Text>
             </View>
-            <View className="mt-4">{progressBar}</View>
+            <View
+                className="mt-4 self-center"
+                style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                }}
+            >
+                {progressBar}
+            </View>
         </ScrollView>
     )
 }

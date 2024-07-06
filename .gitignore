@@ -132,3 +132,4 @@ dist
 __tests__/
 tmp.*
 tmp/
+tmp*
