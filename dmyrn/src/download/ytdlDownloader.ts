@@ -8,6 +8,7 @@ import { ytdlDownloadInterface } from '../interfaces/ytdlDownloaderInterface'
 import { RNFS, cacheDir } from '../lib/rnfs'
 import { secureFilename } from '../utils/secureFilename'
 import { FileSystem } from 'react-native-file-access'
+import { PlaylistExtractor } from './playlistExtractor'
 
 export class ytdlDownload implements ytdlDownloadInterface {
     videoUrl: string
@@ -16,12 +17,16 @@ export class ytdlDownload implements ytdlDownloadInterface {
     jobId: number
     progressBar: (progress: number, infinite: boolean) => void
     output: (text: string) => void
+    contentType: 'video' | 'audio' | 'playlist'
+    playlistVideos: string[]
+    playlistExtractor: PlaylistExtractor
 
     constructor(
         videoUrl: string,
         quality: 'mp3' | videoFormats,
         progressBar: (progress: number, infinite: boolean) => void,
-        output: (text: string) => void
+        output: (text: string) => void,
+        playlistExtractor: PlaylistExtractor
     ) {
         const qualityMap = {
             mp3: 140,
@@ -38,13 +43,31 @@ export class ytdlDownload implements ytdlDownloadInterface {
         this.saveFormat = saveFormatMap[quality]
         this.progressBar = progressBar
         this.output = output
+        this.playlistExtractor = playlistExtractor
+        this.contentType = 'video'
+        if (videoUrl.includes('?list=')) {
+            this.contentType = 'playlist'
+        }
     }
 
     async download() {
-        this.output('Coletando informações do vídeo!')
-        this.progressBar(0, true)
-        console.log(`Quality: ${this.quality}`)
+        if (this.contentType === 'playlist') {
+            // download playlist
+            await this.playlistDownload()
+        } else {
+            // one download
+            await this.baseDownloader()
+        }
+        return true
+    }
 
+    async cancel() {
+        this.output('Iniciando o cancelamento do download')
+        await RNFS.stopDownload(this.jobId)
+        this.output('Download cancelado')
+    }
+
+    private extractUrlToVideo = async () => {
         const id = await ytdl.getVideoID(this.videoUrl)
         const info = (await ytdl.getInfo(id, {})) as ytdlInfoType
         const format = this.filterFormat(info.formats)
@@ -64,16 +87,21 @@ export class ytdlDownload implements ytdlDownloadInterface {
             this.saveFormat
         }`
 
-        this.output(`Iniciando download de: ${title}`)
-        this.unlinkTemporaryFile(fileTemporary)
+        return [title, url, fileTemporary]
+    }
 
+    private downloadContent = async (
+        title: string,
+        url: string,
+        fileTemporary: string
+    ) => {
         await RNFS.downloadFile({
             fromUrl: url,
             toFile: fileTemporary,
             background: true,
             begin: (res) => {
                 this.jobId = res.jobId
-                this.output('Download iniciado')
+                this.output(`Download de ${title} iniciado`)
             },
             progress: (res) => {
                 // Handle download progress updates if needed
@@ -83,13 +111,33 @@ export class ytdlDownload implements ytdlDownloadInterface {
         })
             .promise.then((response) => {
                 console.log('File downloaded!', response)
-                this.output('Download finalizado')
                 this.progressBar(-1, false)
             })
             .catch((err) => {
                 console.log('Download error:', err)
                 this.output('Erro no download')
             })
+    }
+
+    private baseDownloader = async () => {
+        this.output('Coletando informações do vídeo!')
+        this.progressBar(0, true)
+        console.log(`Quality: ${this.quality}`)
+
+        const videoExtract = await this.extractUrlToVideo()
+        const title = videoExtract[0]
+        const url = videoExtract[1]
+        const fileTemporary = videoExtract[2]
+
+        this.output(`Iniciando download de: ${title}`)
+        this.unlinkTemporaryFile(fileTemporary)
+
+        await this.downloadContent(title, url, fileTemporary)
+
+        if (this.contentType === 'audio') {
+            // convert to mp3
+        }
+
         console.log('copy to external')
 
         await FileSystem.cpExternal(
@@ -98,12 +146,19 @@ export class ytdlDownload implements ytdlDownloadInterface {
             'downloads'
         )
         this.unlinkTemporaryFile(fileTemporary)
+
+        this.output(`Download de ${title} finalizado!`)
+
+        if (
+            this.contentType === 'playlist' &&
+            this.playlistVideos.length !== 0
+        ) {
+            this.nextPlaylistDownload()
+        }
+
+        return true
     }
-    async cancel() {
-        this.output('Iniciando o cancelamento do download')
-        await RNFS.stopDownload(this.jobId)
-        this.output('Download cancelado')
-    }
+
     private filterFormat = (data: ytdlObjectFormats[]): ytdlObjectFormats => {
         let toReturn
         data.forEach((video) => {
@@ -114,11 +169,29 @@ export class ytdlDownload implements ytdlDownloadInterface {
         })
         return toReturn
     }
+
     private unlinkTemporaryFile = (fileTemporary) => {
         try {
             RNFS.unlink(fileTemporary)
         } catch (e) {
             console.log(e)
         }
+    }
+
+    private playlistDownload = async () => {
+        this.output('Extraindo vídeos da playlist.')
+        const videos = await this.playlistExtractor.getVideos(this.videoUrl)
+        this.playlistVideos = videos
+
+        this.output('Iniciando download da playlist.')
+        await this.nextPlaylistDownload()
+        this.output('Download da playlist concluído.')
+        return true
+    }
+
+    private nextPlaylistDownload = async () => {
+        this.videoUrl = this.playlistVideos[0]
+        await this.baseDownloader()
+        this.playlistVideos.shift()
     }
 }

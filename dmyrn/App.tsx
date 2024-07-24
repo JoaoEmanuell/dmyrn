@@ -14,6 +14,7 @@ import Dropdown from './components/ui/Dropdown'
 import { getRandomElementKey } from './src/lib/randomElementKey'
 import { ytdlDownload } from './src/download/ytdlDownloader'
 import { requestAndroidPermissions } from './src/lib/androidPermissions'
+import { PlaylistExtractor } from './src/download/playlistExtractor'
 
 export default function App() {
     const [input, onChangeInput] = useState(
@@ -52,8 +53,10 @@ export default function App() {
                     input,
                     selectedQuality,
                     setProgressBarValue,
-                    setOutputText
+                    setOutputText,
+                    new PlaylistExtractor()
                 )
+                setYtdlInstance(ytdlDownloadInstance)
                 await ytdlDownloadInstance.download()
             }
         } else {
