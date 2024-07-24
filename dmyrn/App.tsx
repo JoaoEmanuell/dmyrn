@@ -70,6 +70,8 @@ export default function App() {
                 setDownloadStatus(false)
                 setTextDownloadButton('Parar download')
                 await ytdlDownloadInstance.download()
+                setDownloadStatus(true)
+                setTextDownloadButton('Baixar música ou playlist')
             }
         } else {
             setOutputText('Url inválida!')
