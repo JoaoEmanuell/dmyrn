@@ -17,6 +17,7 @@ import { requestAndroidPermissions } from './src/lib/androidPermissions'
 import { PlaylistExtractor } from './src/download/playlistExtractor'
 
 export default function App() {
+    type buttonColor = '' | 'bg-gray-500'
     const [input, onChangeInput] = useState(
         'https://youtu.be/example?si=example'
     )
@@ -25,9 +26,12 @@ export default function App() {
     const [selectedItem, setSelected] = useState<'360' | '720' | ''>('')
     const [formatSelected, setFormatSelected] = useState<'mp3' | 'mp4'>('mp3')
     const [dropdown, setDropdown] = useState<JSX.Element | null>(null)
-    const [mp3ButtonColor, setMp3ButtonColor] = useState<'' | 'bg-gray-500'>('')
+    const [mp3ButtonColor, setMp3ButtonColor] = useState<buttonColor>('')
     const [downloadStatus, setDownloadStatus] = useState(true) // if true download is allowed, else stop the download
     const [ytdlInstance, setYtdlInstance] = useState<undefined | ytdlDownload>()
+    const [textDownloadButton, setTextDownloadButton] = useState<
+        'Baixar música ou playlist' | 'Parar download'
+    >('Baixar música ou playlist')
 
     const data = [
         { key: '360', value: '360p' },
@@ -35,9 +39,15 @@ export default function App() {
     ]
 
     const pressDownloadButton = async () => {
-        console.log(selectedItem)
-        console.log(formatSelected)
-        console.log(input)
+        if (downloadStatus === false) {
+            // stop download
+            await ytdlInstance.cancel()
+            setOutputText('Download cancelado')
+            setDownloadStatus(true)
+            setProgressBarValue(-1)
+            setTextDownloadButton('Baixar música ou playlist')
+            return
+        }
 
         const urlValidator = UrlValidator(input)
 
@@ -57,6 +67,8 @@ export default function App() {
                     new PlaylistExtractor()
                 )
                 setYtdlInstance(ytdlDownloadInstance)
+                setDownloadStatus(false)
+                setTextDownloadButton('Parar download')
                 await ytdlDownloadInstance.download()
             }
         } else {
@@ -133,7 +145,7 @@ export default function App() {
             <View className="mt-4">
                 <GrayButton
                     onPress={pressDownloadButton}
-                    text="Baixar música ou playlist"
+                    text={textDownloadButton}
                     pressableClassName="mx-12"
                 />
             </View>

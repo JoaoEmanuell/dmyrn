@@ -20,6 +20,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
     contentType: 'video' | 'audio' | 'playlist'
     playlistVideos: string[]
     playlistExtractor: PlaylistExtractor
+    downloadStop: boolean = false
 
     constructor(
         videoUrl: string,
@@ -63,7 +64,11 @@ export class ytdlDownload implements ytdlDownloadInterface {
 
     async cancel() {
         this.output('Iniciando o cancelamento do download')
-        await RNFS.stopDownload(this.jobId)
+        this.downloadStop = true
+        this.playlistVideos = []
+        if (this.jobId !== undefined) {
+            await RNFS.stopDownload(this.jobId)
+        }
         this.output('Download cancelado')
     }
 
@@ -82,7 +87,6 @@ export class ytdlDownload implements ytdlDownloadInterface {
 
         const url = `${format.url}`
         const title = info.videoDetails.title
-        console.log(url)
         const fileTemporary = `${cacheDir}/${secureFilename(title)}.${
             this.saveFormat
         }`
@@ -114,8 +118,12 @@ export class ytdlDownload implements ytdlDownloadInterface {
                 this.progressBar(-1, false)
             })
             .catch((err) => {
-                console.log('Download error:', err)
-                this.output('Erro no download')
+                if (err.toString().includes('aborted')) {
+                    // aborted download
+                } else {
+                    console.log('Download error:', err)
+                    this.output('Erro no download')
+                }
             })
     }
 
@@ -129,10 +137,20 @@ export class ytdlDownload implements ytdlDownloadInterface {
         const url = videoExtract[1]
         const fileTemporary = videoExtract[2]
 
+        if (this.downloadStop) {
+            // user stop download in extract step
+            return true
+        }
+
         this.output(`Iniciando download de: ${title}`)
         this.unlinkTemporaryFile(fileTemporary)
 
         await this.downloadContent(title, url, fileTemporary)
+
+        if (this.downloadStop) {
+            // user stop download
+            return true
+        }
 
         if (this.contentType === 'audio') {
             // convert to mp3
@@ -185,7 +203,9 @@ export class ytdlDownload implements ytdlDownloadInterface {
 
         this.output('Iniciando download da playlist.')
         await this.nextPlaylistDownload()
-        this.output('Download da playlist concluído.')
+        if (!this.downloadStop) {
+            this.output('Download da playlist concluído.')
+        }
         return true
     }
 
