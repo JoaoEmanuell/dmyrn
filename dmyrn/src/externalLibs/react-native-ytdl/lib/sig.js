@@ -140,9 +140,9 @@ exports.decipherFormats = async(formats, html5player, options) => {
     // used to update the scripts
     console.log("Sig scripts: ");
     console.log("decipherScript");
-    console.log(decipherScript ? functions[0].replace(/(\w+)\(sig\);/g, 'return $1(sig);') : 'erro to extract decipher script');
+    console.log(decipherScript ? 'Decipher extraction work with success' : 'erro to extract decipher script');
     console.log("nTransformScript");
-    console.log(nTransformScript ? functions[1] : 'erro to extract nTransform script');
+    console.log(nTransformScript ? 'nTransform extraction work with success' : 'erro to extract nTransform script');
   }
   
   formats.forEach(format => {

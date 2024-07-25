@@ -9,28 +9,39 @@ import { RNFS, cacheDir } from '../lib/rnfs'
 import { secureFilename } from '../utils/secureFilename'
 import { FileSystem } from 'react-native-file-access'
 import { PlaylistExtractor } from './playlistExtractor'
+import { Ffmpeg } from '../ffmpeg/ffmpeg'
+import { unlinkFile } from '../utils/unlinkFile'
 
 export class ytdlDownload implements ytdlDownloadInterface {
+    // public properties
     videoUrl: string
     quality: 140 | 22 | 18
-    saveFormat: 'm4a' | 'mp4'
-    jobId: number
     progressBar: (progress: number, infinite: boolean) => void
     output: (text: string) => void
-    contentType: 'video' | 'audio' | 'playlist'
-    playlistVideos: string[]
+    messageFinishedDownload: () => void
     playlistExtractor: PlaylistExtractor
-    downloadStop: boolean = false
+    ffmpeg: Ffmpeg
+
+    // private properties
+
+    private saveFormat: 'm4a' | 'mp4' | 'mp3' // m4a is used to save the 360p in audio format to use ffmpeg for convert to mp3
+    private jobId: number // used to RNFS to stop download
+    private contentType: 'video' | 'audio'
+    private playlistVideos: string[] // string array withe the videos of the playlist
+    private downloadStop: boolean = false // if true, the user clicked in stop download button
+    private isPlaylist: boolean = false // if true, the url is a playlist
 
     constructor(
         videoUrl: string,
         quality: 'mp3' | videoFormats,
         progressBar: (progress: number, infinite: boolean) => void,
         output: (text: string) => void,
-        playlistExtractor: PlaylistExtractor
+        messageFinishedDownload: () => void,
+        playlistExtractor: PlaylistExtractor,
+        ffmpeg: Ffmpeg
     ) {
         const qualityMap = {
-            mp3: 140,
+            mp3: 18, // yes, the download of the mp3 is in 360p to accelerate
             '720': 22,
             '360': 18,
         }
@@ -44,20 +55,26 @@ export class ytdlDownload implements ytdlDownloadInterface {
         this.saveFormat = saveFormatMap[quality]
         this.progressBar = progressBar
         this.output = output
+        this.messageFinishedDownload = messageFinishedDownload
         this.playlistExtractor = playlistExtractor
+        this.ffmpeg = ffmpeg
         this.contentType = 'video'
+        if (this.saveFormat === 'm4a') {
+            this.contentType = 'audio'
+        }
         if (videoUrl.includes('?list=')) {
-            this.contentType = 'playlist'
+            this.isPlaylist = true
         }
     }
 
     async download() {
-        if (this.contentType === 'playlist') {
+        if (this.isPlaylist) {
             // download playlist
             await this.playlistDownload()
         } else {
             // one download
             await this.baseDownloader()
+            this.messageFinishedDownload()
         }
         return true
     }
@@ -69,9 +86,15 @@ export class ytdlDownload implements ytdlDownloadInterface {
         if (this.jobId !== undefined) {
             await RNFS.stopDownload(this.jobId)
         }
+        await this.ffmpeg.stop()
+        this.progressBar(-1, false)
         this.output('Download cancelado')
     }
 
+    /**
+     * extract the url to video, case the format is not available return a empty, and cancel the execution
+     * @returns [title, url, filename with path to temporary file (saved in cache dir)]
+     */
     private extractUrlToVideo = async () => {
         const id = await ytdl.getVideoID(this.videoUrl)
         const info = (await ytdl.getInfo(id, {})) as ytdlInfoType
@@ -94,6 +117,12 @@ export class ytdlDownload implements ytdlDownloadInterface {
         return [title, url, fileTemporary]
     }
 
+    /**
+     * used to manage the RNFS download file, download the video in YouTube
+     * @param title title of the video
+     * @param url url of the video
+     * @param fileTemporary temporary file to video
+     */
     private downloadContent = async (
         title: string,
         url: string,
@@ -127,6 +156,10 @@ export class ytdlDownload implements ytdlDownloadInterface {
             })
     }
 
+    /**
+     * base downloader is called to manager the download, this method call the extractor, download content, conversion for mp3, next playlist video download (if the last video download, call the message for finished download)
+     * @returns promise with true
+     */
     private baseDownloader = async () => {
         this.output('Coletando informações do vídeo!')
         this.progressBar(0, true)
@@ -135,7 +168,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
         const videoExtract = await this.extractUrlToVideo()
         const title = videoExtract[0]
         const url = videoExtract[1]
-        const fileTemporary = videoExtract[2]
+        let fileTemporary = videoExtract[2]
 
         if (this.downloadStop) {
             // user stop download in extract step
@@ -143,7 +176,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
         }
 
         this.output(`Iniciando download de: ${title}`)
-        this.unlinkTemporaryFile(fileTemporary)
+        unlinkFile(fileTemporary)
 
         await this.downloadContent(title, url, fileTemporary)
 
@@ -152,30 +185,51 @@ export class ytdlDownload implements ytdlDownloadInterface {
             return true
         }
 
+        let formatToSaveFileInDownloads = this.saveFormat
+
         if (this.contentType === 'audio') {
             // convert to mp3
+            this.output('Convertendo para mp3')
+            fileTemporary = await this.ffmpeg.convertM4aToMp3(
+                fileTemporary,
+                this.progressBar
+            )
+
+            console.log(`end conversion ${fileTemporary}`)
+            formatToSaveFileInDownloads = 'mp3'
+
+            this.output('Conversão concluída')
         }
 
         console.log('copy to external')
 
         await FileSystem.cpExternal(
             fileTemporary,
-            `${secureFilename(title)}.${this.saveFormat}`,
+            `${secureFilename(title)}.${formatToSaveFileInDownloads}`,
             'downloads'
         )
-        this.unlinkTemporaryFile(fileTemporary)
+        unlinkFile(fileTemporary)
 
         this.output(`Download de ${title} finalizado!`)
+        this.progressBar(-1, false)
 
-        if (
-            this.contentType === 'playlist' &&
-            this.playlistVideos.length !== 0
-        ) {
+        if (this.isPlaylist && this.playlistVideos.length !== 0) {
+            // next playlist download
             this.nextPlaylistDownload()
+        } else if (this.isPlaylist && this.playlistVideos.length === 0) {
+            // message of the end playlist
+            this.output('Download da playlist concluído.')
+            this.messageFinishedDownload()
         }
 
         return true
     }
+
+    /**
+     * used to get the one object of the ytdl
+     * @param data array with all ytdl objects
+     * @returns one ytdl object
+     */
 
     private filterFormat = (data: ytdlObjectFormats[]): ytdlObjectFormats => {
         let toReturn
@@ -188,13 +242,10 @@ export class ytdlDownload implements ytdlDownloadInterface {
         return toReturn
     }
 
-    private unlinkTemporaryFile = (fileTemporary) => {
-        try {
-            RNFS.unlink(fileTemporary)
-        } catch (e) {
-            console.log(e)
-        }
-    }
+    /**
+     * extract the playlist videos, and set the playlist videos with extracted videos, start the playlist download
+     * @returns promise with boolean
+     */
 
     private playlistDownload = async () => {
         this.output('Extraindo vídeos da playlist.')
@@ -203,15 +254,15 @@ export class ytdlDownload implements ytdlDownloadInterface {
 
         this.output('Iniciando download da playlist.')
         await this.nextPlaylistDownload()
-        if (!this.downloadStop) {
-            this.output('Download da playlist concluído.')
-        }
         return true
     }
 
+    /**
+     * get the video url in playlist videos and download the video
+     */
     private nextPlaylistDownload = async () => {
         this.videoUrl = this.playlistVideos[0]
-        await this.baseDownloader()
         this.playlistVideos.shift()
+        await this.baseDownloader()
     }
 }

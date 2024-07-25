@@ -1,5 +1,10 @@
 import { PermissionsAndroid } from 'react-native'
 
+/**
+ * used to request the android permissions for the app works
+ *
+ * request the write external
+ */
 export const requestAndroidPermissions = async () => {
     try {
         const granted = await PermissionsAndroid.request(

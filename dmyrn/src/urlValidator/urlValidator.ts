@@ -3,6 +3,11 @@ type urlValidatorReturn = {
     type: 'video' | 'playlist' | undefined
 }
 
+/**
+ * validate the url
+ * @param url url to content
+ * @returns `{ status: boolean (true if valide), type: { 'playlist' | 'video'}}`
+ */
 export function UrlValidator(url: string): urlValidatorReturn {
     const validHosts = ['youtu.be', 'music.youtube.com', 'youtube.com']
     let returnData: urlValidatorReturn = { status: false, type: undefined }

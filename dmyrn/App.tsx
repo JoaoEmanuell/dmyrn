@@ -1,9 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable react-native/no-inline-styles */
-/* eslint-disable semi */
-/* eslint-disable react/react-in-jsx-scope */
-
 import { useState, useEffect } from 'react'
 import { ScrollView, TextInput, View, Text } from 'react-native'
 import { Bar, Circle } from 'react-native-progress'
@@ -15,6 +9,7 @@ import { getRandomElementKey } from './src/lib/randomElementKey'
 import { ytdlDownload } from './src/download/ytdlDownloader'
 import { requestAndroidPermissions } from './src/lib/androidPermissions'
 import { PlaylistExtractor } from './src/download/playlistExtractor'
+import { Ffmpeg } from './src/ffmpeg/ffmpeg'
 
 export default function App() {
     type buttonColor = '' | 'bg-gray-500'
@@ -28,16 +23,20 @@ export default function App() {
     const [dropdown, setDropdown] = useState<JSX.Element | null>(null)
     const [mp3ButtonColor, setMp3ButtonColor] = useState<buttonColor>('')
     const [downloadStatus, setDownloadStatus] = useState(true) // if true download is allowed, else stop the download
-    const [ytdlInstance, setYtdlInstance] = useState<undefined | ytdlDownload>()
     const [textDownloadButton, setTextDownloadButton] = useState<
         'Baixar música ou playlist' | 'Parar download'
     >('Baixar música ou playlist')
+    const [ytdlInstance, setYtdlInstance] = useState<undefined | ytdlDownload>()
 
     const data = [
         { key: '360', value: '360p' },
         { key: '720', value: '720p' },
     ]
 
+    /**
+     * used to start / stop download
+     * @returns void
+     */
     const pressDownloadButton = async () => {
         if (downloadStatus === false) {
             // stop download
@@ -64,25 +63,34 @@ export default function App() {
                     selectedQuality,
                     setProgressBarValue,
                     setOutputText,
-                    new PlaylistExtractor()
+                    messageFinishedDownload,
+                    new PlaylistExtractor(),
+                    new Ffmpeg()
                 )
                 setYtdlInstance(ytdlDownloadInstance)
                 setDownloadStatus(false)
                 setTextDownloadButton('Parar download')
                 await ytdlDownloadInstance.download()
-                setDownloadStatus(true)
-                setTextDownloadButton('Baixar música ou playlist')
             }
         } else {
             setOutputText('Url inválida!')
         }
     }
 
+    /**
+     * reset dropdown, change the mp3 button color, and set the format to mp3
+     */
+
     const onPressMp3Button = () => {
         setFormatSelected('mp3')
         setDropdown(getDropdown)
         setMp3ButtonColor('bg-gray-500')
     }
+
+    /**
+     * get a initial dropdown
+     * @returns Dropdown component
+     */
 
     const getDropdown = () => {
         return (
@@ -100,6 +108,12 @@ export default function App() {
         )
     }
 
+    /**
+     * progress bar manage
+     * @param progress number of progress, in decimal, if is equal to -1, then hidden progressbar
+     * @param infinite if true, then progress bar set to a circle, else progress bar set to a bar
+     */
+
     const setProgressBarValue = (
         progress: number,
         infinite: boolean = false
@@ -113,9 +127,20 @@ export default function App() {
         }
     }
 
+    /**
+     * used by ytdl downloader when finished all downloads
+     */
+    const messageFinishedDownload = () => {
+        setProgressBarValue(-1)
+        setDownloadStatus(true)
+        setTextDownloadButton('Baixar música ou playlist')
+    }
+
     useEffect(() => {
         requestAndroidPermissions()
         setDropdown(getDropdown())
+        const ffmpeg = new Ffmpeg()
+        ffmpeg.initFfmpeg()
     }, [])
 
     return (
