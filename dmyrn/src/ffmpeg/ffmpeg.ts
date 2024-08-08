@@ -1,6 +1,7 @@
 import { FFmpegKit, FFmpegKitConfig } from 'ffmpeg-kit-react-native'
 import { unlinkFile } from '../utils/unlinkFile'
 import { FfmpegInterface } from '../interfaces/ffmpegInterface'
+import { Logger } from '../utils/log'
 
 export class Ffmpeg implements FfmpegInterface {
     private stopConversion: boolean = false
@@ -15,7 +16,7 @@ export class Ffmpeg implements FfmpegInterface {
         filenameSavedInCacheDir: string,
         progressBar: (progress: number, infinite: boolean) => void
     ): Promise<string> {
-        console.log('start convert to mp3')
+        Logger.debug('start convert to mp3')
         const treatedFilenameSavedInCacheDir = filenameSavedInCacheDir.replace(
             '.m4a',
             'mp3'
@@ -59,7 +60,7 @@ export class Ffmpeg implements FfmpegInterface {
                         // hidden the progress bar if conversion is stoped
                         progressBar(-1, false)
                     }
-                    // console.log(`Conversion Progress: ${progress.toFixed(2)}%`)
+                    // Logger.debug(`Conversion Progress: ${progress.toFixed(2)}%`)
                 }
             ).catch((err) => {
                 reject(err)

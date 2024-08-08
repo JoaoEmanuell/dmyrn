@@ -2,24 +2,10 @@ const URL = require("./__REACT_NATIVE_YTDL_CUSTOM_MODULES__/url").URL;
 const querystring = require('querystring');
 const Cache = require('./cache');
 const utils = require('./utils');
+const { Logger } = require("../../../utils/log");
 
 // A shared cache to keep track of html5player js functions.
 exports.cache = new Cache();
-
-const matchRegex = (regex, str) => {
-  const match = str.match(new RegExp(regex, 's'));
-  if (!match) throw new Error(`Could not match ${regex}`);
-  return match;
-};
-
-const matchFirst = (regex, str) => matchRegex(regex, str)[0];
-
-const N_TRANSFORM_REGEXP = 'function\\(\\s*(\\w+)\\s*\\)\\s*\\{' +
-'var\\s*(\\w+)=(?:\\1\\.split\\(""\\)|String\\.prototype\\.split\\.call\\(\\1,""\\)),' +
-'\\s*(\\w+)=(\\[.*?]);\\s*\\3\\[\\d+]' +
-'(.*?try)(\\{.*?})catch\\(\\s*(\\w+)\\s*\\)\\s*\\' +
-'{\\s*return"enhanced_except_([A-z0-9-]+)"\\s*\\+\\s*\\1\\s*}' +
-'\\s*return\\s*(\\2\\.join\\(""\\)|Array\\.prototype\\.join\\.call\\(\\2,""\\))};';
 
 /**
  * Extract signature deciphering and n parameter transform functions from html5player file.
@@ -70,14 +56,28 @@ exports.extractFunctions = body => {
     }
   };
   const extractNCode = () => {
-    // solved using the https://github.com/distubejs/ytdl-core/commit/3df824e57fe4ce3037a91efd124b729dea38c01f
-    const nFunc = matchFirst(N_TRANSFORM_REGEXP, body);
-    const N_TRANSFORM_FUNC_NAME = 'nCodeExtractor'
-    const N_ARGUMENT = 'ncode'
-    const resultFunc = `var ${N_TRANSFORM_FUNC_NAME}=${nFunc}`;
-    const callerFunc = `return ${N_TRANSFORM_FUNC_NAME}(${N_ARGUMENT});`;
-    functions.push(resultFunc + callerFunc)
-    return
+    // adapted from https://github.com/fent/node-ytdl-core/issues/1301#issuecomment-2265135782
+    const alphanum = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTVUWXYZ.$_0123456789';
+    let functionName = '';
+    let clue = body.indexOf('enhanced_except');
+    if (clue < 0) clue = body.indexOf('String.prototype.split.call(a,"")');
+    if (clue < 0) clue = body.indexOf('Array.prototype.join.call(b,"")');
+    if (clue > 0) {
+        let nstart = body.lastIndexOf('=function(a){', clue) - 1;
+        while (nstart && alphanum.includes(body.charAt(nstart))) {
+	    functionName = body.charAt(nstart) + functionName;
+	    nstart--;
+        }
+    }
+    if (functionName && functionName.length) {
+      const functionStart = `${functionName}=function(a)`;
+      const ndx = body.indexOf(functionStart);
+      if (ndx >= 0) {
+        const subBody = body.slice(ndx + functionStart.length);
+        const functionBody = `var ${functionStart}${utils.cutAfterJS(subBody)};return ${functionName}(ncode);`;
+        functions.push(functionBody)
+      }
+    }
   };
   extractDecipher();
   extractNCode();
@@ -94,16 +94,16 @@ exports.extractFunctions = body => {
 exports.setDownloadURL = (format, decipherScript, nTransformScript) => {
   const decipher = url => {
     const args = querystring.parse(url);
-    // console.log(`setDownloadURL decipher args ${args}`);
-    // console.log(`args s ${args.s}`);
+    // Logger.debug(`setDownloadURL decipher args ${args}`);
+    // Logger.debug(`args s ${args.s}`);
     if (!args.s || !decipherScript) return args.url;
     const components = new URL(decodeURIComponent(args.url));
-    // console.log(`setDownloadURL decipher components ${components}`);
+    // Logger.debug(`setDownloadURL decipher components ${components}`);
     // const sig = decipherCodeFunction(decodeURIComponent(args.s))
     const sig = decipherScript(decodeURIComponent(args.s))
-    // console.log(`sig: ${sig}`);
+    // Logger.debug(`sig: ${sig}`);
     components.searchParams.set(args.sp ? args.sp : 'signature', sig)
-    // console.log(`setDownloadURL decipher components search ${components.toString()}`);
+    // Logger.debug(`setDownloadURL decipher components search ${components.toString()}`);
     return components.toString();
   };
   const ncode = url => {
@@ -117,7 +117,7 @@ exports.setDownloadURL = (format, decipherScript, nTransformScript) => {
   const cipher = !format.url;
   const url = format.url || format.signatureCipher || format.cipher;
   format.url = cipher ? ncode(decipher(url)) : ncode(url);
-  // console.log(`URL: ${format.url}`)
+  // Logger.debug(`URL: ${format.url}`)
   delete format.signatureCipher;
   delete format.cipher;
 };
@@ -138,11 +138,11 @@ exports.decipherFormats = async(formats, html5player, options) => {
 
   if (__DEV__) {
     // used to update the scripts
-    console.log("Sig scripts: ");
-    console.log("decipherScript");
-    console.log(decipherScript ? 'Decipher extraction work with success' : 'erro to extract decipher script');
-    console.log("nTransformScript");
-    console.log(nTransformScript ? 'nTransform extraction work with success' : 'erro to extract nTransform script');
+    Logger.debug("Sig scripts: ");
+    Logger.debug("decipherScript");
+    Logger.debug(decipherScript ? 'Decipher extraction work with success' : 'erro to extract decipher script');
+    Logger.debug("nTransformScript");
+    Logger.debug(nTransformScript ? 'nTransform extraction work with success' : 'erro to extract nTransform script');
   }
   
   formats.forEach(format => {

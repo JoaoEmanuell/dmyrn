@@ -11,6 +11,7 @@ import { FileSystem } from 'react-native-file-access'
 import { PlaylistExtractor } from './playlistExtractor'
 import { Ffmpeg } from '../ffmpeg/ffmpeg'
 import { unlinkFile } from '../utils/unlinkFile'
+import { Logger } from '../utils/log'
 
 export class ytdlDownload implements ytdlDownloadInterface {
     // public properties
@@ -143,14 +144,14 @@ export class ytdlDownload implements ytdlDownloadInterface {
             },
         })
             .promise.then((response) => {
-                console.log('File downloaded!', response)
+                Logger.debug('File downloaded!', response)
                 this.progressBar(-1, false)
             })
             .catch((err) => {
                 if (err.toString().includes('aborted')) {
                     // aborted download
                 } else {
-                    console.log('Download error:', err)
+                    Logger.debug('Download error:', err)
                     this.output('Erro no download')
                 }
             })
@@ -163,7 +164,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
     private baseDownloader = async () => {
         this.output('Coletando informações do vídeo!')
         this.progressBar(0, true)
-        console.log(`Quality: ${this.quality}`)
+        Logger.debug(`Quality: ${this.quality}`)
 
         const videoExtract = await this.extractUrlToVideo()
         const title = videoExtract[0]
@@ -178,7 +179,15 @@ export class ytdlDownload implements ytdlDownloadInterface {
         this.output(`Iniciando download de: ${title}`)
         unlinkFile(fileTemporary)
 
-        await this.downloadContent(title, url, fileTemporary)
+        try {
+            await this.downloadContent(title, url, fileTemporary)
+        } catch (err) {
+            // error in download
+            Logger.error(`Error to download ${err}`)
+            this.progressBar(-1, false)
+            this.output('Erro no download!')
+            return false
+        }
 
         if (this.downloadStop) {
             // user stop download
@@ -195,13 +204,13 @@ export class ytdlDownload implements ytdlDownloadInterface {
                 this.progressBar
             )
 
-            console.log(`end conversion ${fileTemporary}`)
+            Logger.debug(`end conversion ${fileTemporary}`)
             formatToSaveFileInDownloads = 'mp3'
 
             this.output('Conversão concluída')
         }
 
-        console.log('copy to external')
+        Logger.debug('copy to external')
 
         await FileSystem.cpExternal(
             fileTemporary,

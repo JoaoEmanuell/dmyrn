@@ -133,3 +133,4 @@ __tests__/
 tmp.*
 tmp/
 tmp*
+build.gradle
