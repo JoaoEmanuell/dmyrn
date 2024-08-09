@@ -135,7 +135,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
             background: true,
             begin: (res) => {
                 this.jobId = res.jobId
-                this.output(`Download de ${title} iniciado`)
+                this.output(`Download de: \n${title}\n iniciado`)
             },
             progress: (res) => {
                 // Handle download progress updates if needed
@@ -176,7 +176,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
             return true
         }
 
-        this.output(`Iniciando download de: ${title}`)
+        this.output(`Iniciando download de: \n${title}`)
         unlinkFile(fileTemporary)
 
         try {
@@ -219,7 +219,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
         )
         unlinkFile(fileTemporary)
 
-        this.output(`Download de ${title} finalizado!`)
+        this.output(`Download de: \n${title}\n finalizado!`)
         this.progressBar(-1, false)
 
         if (this.isPlaylist && this.playlistVideos.length !== 0) {

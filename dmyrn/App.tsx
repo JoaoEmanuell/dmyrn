@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { ScrollView, TextInput, View, Text } from 'react-native'
+import { ScrollView, TextInput, View, Text, AppState } from 'react-native'
 import { Bar, Circle } from 'react-native-progress'
-import { UrlValidator } from './src/urlValidator/urlValidator'
+import ReceiveSharingIntent from 'react-native-receive-sharing-intent'
 
+import { UrlValidator } from './src/urlValidator/urlValidator'
 import GrayButton from './components/ui/GrayButton'
 import Dropdown from './components/ui/Dropdown'
 import { getRandomElementKey } from './src/lib/randomElementKey'
@@ -10,12 +11,12 @@ import { ytdlDownload } from './src/download/ytdlDownloader'
 import { requestAndroidPermissions } from './src/lib/androidPermissions'
 import { PlaylistExtractor } from './src/download/playlistExtractor'
 import { Ffmpeg } from './src/ffmpeg/ffmpeg'
+import { Logger } from './src/utils/log'
+import { fileIntent } from './src/interfaces/types'
 
 export default function App() {
     type buttonColor = '' | 'bg-gray-500'
-    const [input, onChangeInput] = useState(
-        'https://youtu.be/example?si=example'
-    )
+    const [input, onChangeInput] = useState('')
     const [progressBar, setProgressBar] = useState<JSX.Element | null>(null)
     const [outputText, setOutputText] = useState('')
     const [selectedItem, setSelected] = useState<'360' | '720' | ''>('')
@@ -136,11 +137,36 @@ export default function App() {
         setTextDownloadButton('Baixar música ou playlist')
     }
 
+    const getIntent = () => {
+        ReceiveSharingIntent.getReceivedFiles(
+            (files: fileIntent[]) => {
+                Logger.debug(`receive sharing`)
+                files.map((file) => {
+                    if (file.weblink) {
+                        onChangeInput(file.weblink)
+                    }
+                })
+            },
+            (err) => {
+                if (
+                    err.toString() !==
+                    "Error: java.lang.NullPointerException: Attempt to invoke virtual method 'java.lang.String android.content.Intent.getAction()' on a null object reference"
+                ) {
+                    //normal error :/
+                    Logger.error(`intent error: ${err}`)
+                }
+            }
+        )
+    }
+
     useEffect(() => {
         requestAndroidPermissions()
         setDropdown(getDropdown())
         const ffmpeg = new Ffmpeg()
         ffmpeg.initFfmpeg()
+        // get the intent
+        getIntent()
+        AppState.addEventListener('change', getIntent)
     }, [])
 
     return (
@@ -179,6 +205,7 @@ export default function App() {
             <View className="mt-4">
                 <Text className="text-black text-center">{outputText}</Text>
             </View>
+
             <View
                 className="mt-4 self-center"
                 style={{
