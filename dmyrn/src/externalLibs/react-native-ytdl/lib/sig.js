@@ -50,7 +50,7 @@ exports.extractFunctions = body => {
       if (ndx >= 0) {
         const subBody = body.slice(ndx + functionStart.length);
         let functionBody = `var ${functionStart}${utils.cutAfterJS(subBody)}`;
-        functionBody = `${extractManipulations(functionBody)};${functionBody};${functionName}(sig);`;
+        functionBody = `${extractManipulations(functionBody)};${functionBody};return ${functionName}(sig);`;
         functions.push(functionBody);
       }
     }
@@ -133,7 +133,7 @@ exports.decipherFormats = async(formats, html5player, options) => {
   let decipheredFormats = {};
   let functions = await exports.getFunctions(html5player, options);
   // get the functions and transform in a javascript function, modified the html5player functions to add a return for main function in code.
-  const decipherScript = functions.length ? new Function('sig', functions[0].replace(/(\w+)\(sig\);/g, 'return $1(sig);')) : null;
+  const decipherScript = functions.length ? new Function('sig', functions[0]) : null;
   const nTransformScript = functions.length > 1 ? new Function('ncode', functions[1]) : null;
 
   if (__DEV__) {
