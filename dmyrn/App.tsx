@@ -14,6 +14,7 @@ import { Ffmpeg } from './src/ffmpeg/ffmpeg'
 import { Logger } from './src/utils/log'
 import { fileIntent } from './src/interfaces/types'
 import { Notification } from './src/notification/notification'
+import { Updater } from './src/updater/updater'
 
 export default function App() {
     type buttonColor = '' | 'bg-gray-500'
@@ -196,6 +197,9 @@ export default function App() {
         AppState.addEventListener('change', getIntent)
         const notification = new Notification()
         setNotificationInstance(notification)
+        // updater
+        const updater = new Updater()
+        updater.verifyIfHasAnUpdate()
     }, [])
 
     return (
