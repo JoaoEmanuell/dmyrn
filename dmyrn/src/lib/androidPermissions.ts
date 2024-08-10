@@ -1,4 +1,6 @@
 import { PermissionsAndroid } from 'react-native'
+import { logDir, RNFS } from './rnfs'
+import { Logger } from '../utils/log'
 
 /**
  * used to request the android permissions for the app works
@@ -20,10 +22,12 @@ export const requestAndroidPermissions = async () => {
         )
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
             console.log('Você pode salvar os arquivos')
+            RNFS.mkdir(logDir) // create the log dir
         } else {
             console.log('Você não pode salvar os arquivos')
         }
     } catch (err) {
-        console.warn(err)
+        Logger.error(`android request permission error: ${err}`)
+        console.error(`android request permission error: ${err}`)
     }
 }

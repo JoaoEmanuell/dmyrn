@@ -12,6 +12,7 @@ import { PlaylistExtractor } from './playlistExtractor'
 import { Ffmpeg } from '../ffmpeg/ffmpeg'
 import { unlinkFile } from '../utils/unlinkFile'
 import { Logger } from '../utils/log'
+import { Notification } from '../notification/notification'
 
 export class ytdlDownload implements ytdlDownloadInterface {
     // public properties
@@ -22,6 +23,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
     messageFinishedDownload: () => void
     playlistExtractor: PlaylistExtractor
     ffmpeg: Ffmpeg
+    notification: Notification
 
     // private properties
 
@@ -39,7 +41,8 @@ export class ytdlDownload implements ytdlDownloadInterface {
         output: (text: string) => void,
         messageFinishedDownload: () => void,
         playlistExtractor: PlaylistExtractor,
-        ffmpeg: Ffmpeg
+        ffmpeg: Ffmpeg,
+        notification: Notification
     ) {
         const qualityMap = {
             mp3: 18, // yes, the download of the mp3 is in 360p to accelerate
@@ -59,6 +62,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
         this.messageFinishedDownload = messageFinishedDownload
         this.playlistExtractor = playlistExtractor
         this.ffmpeg = ffmpeg
+        this.notification = notification
         this.contentType = 'video'
         if (this.saveFormat === 'm4a') {
             this.contentType = 'audio'
@@ -151,8 +155,9 @@ export class ytdlDownload implements ytdlDownloadInterface {
                 if (err.toString().includes('aborted')) {
                     // aborted download
                 } else {
-                    Logger.debug('Download error:', err)
+                    Logger.error('Download error: ', err)
                     this.output('Erro no download')
+                    throw 'Error to download the content'
                 }
             })
     }
@@ -177,6 +182,10 @@ export class ytdlDownload implements ytdlDownloadInterface {
         }
 
         this.output(`Iniciando download de: \n${title}`)
+        this.notification.sendNotification(
+            'Baixador YouTube',
+            'Iniciando o download'
+        )
         unlinkFile(fileTemporary)
 
         try {
@@ -221,6 +230,10 @@ export class ytdlDownload implements ytdlDownloadInterface {
 
         this.output(`Download de: \n${title}\n finalizado!`)
         this.progressBar(-1, false)
+        await this.notification.sendNotification(
+            'Baixador YouTube',
+            `Download de '${title}' finalizado!`
+        )
 
         if (this.isPlaylist && this.playlistVideos.length !== 0) {
             // next playlist download
@@ -242,7 +255,11 @@ export class ytdlDownload implements ytdlDownloadInterface {
 
     private filterFormat = (data: ytdlObjectFormats[]): ytdlObjectFormats => {
         let toReturn
+        console.log(`formats`)
+
         data.forEach((video) => {
+            console.log(video.itag)
+
             if (video.itag === this.quality) {
                 toReturn = video
                 return video

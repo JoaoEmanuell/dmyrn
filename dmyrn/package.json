@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@dr.pogodin/react-native-fs": "^2.27.1",
+    "@notifee/react-native": "^7.8.2",
     "axios": "^1.6.8",
     "ffmpeg-kit-react-native": "^6.0.2",
     "nativewind": "^2.0.11",

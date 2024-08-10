@@ -1,6 +1,6 @@
 import { logger, fileAsyncTransport, consoleTransport } from 'react-native-logs'
 
-import { RNFS, savePath } from '../lib/rnfs'
+import { logDir, RNFS } from '../lib/rnfs'
 
 const date = new Date()
 
@@ -15,7 +15,7 @@ const config = {
     transportOptions: {
         FS: RNFS,
         fileName: `.dmyrn_log_${date.toISOString().replaceAll(':', '_')}.txt`,
-        filePath: savePath,
+        filePath: logDir,
     },
 }
 

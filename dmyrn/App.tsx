@@ -13,6 +13,7 @@ import { PlaylistExtractor } from './src/download/playlistExtractor'
 import { Ffmpeg } from './src/ffmpeg/ffmpeg'
 import { Logger } from './src/utils/log'
 import { fileIntent } from './src/interfaces/types'
+import { Notification } from './src/notification/notification'
 
 export default function App() {
     type buttonColor = '' | 'bg-gray-500'
@@ -28,6 +29,10 @@ export default function App() {
         'Baixar música ou playlist' | 'Parar download'
     >('Baixar música ou playlist')
     const [ytdlInstance, setYtdlInstance] = useState<undefined | ytdlDownload>()
+    const [notificationInstance, setNotificationInstance] = useState<
+        undefined | Notification
+    >()
+    let lastProgressBarUpdate: Date | undefined = undefined
 
     const data = [
         { key: '360', value: '360p' },
@@ -66,7 +71,8 @@ export default function App() {
                     setOutputText,
                     messageFinishedDownload,
                     new PlaylistExtractor(),
-                    new Ffmpeg()
+                    new Ffmpeg(),
+                    notificationInstance
                 )
                 setYtdlInstance(ytdlDownloadInstance)
                 setDownloadStatus(false)
@@ -119,12 +125,33 @@ export default function App() {
         progress: number,
         infinite: boolean = false
     ) => {
-        if (infinite) {
-            setProgressBar(<Circle size={30} indeterminate />)
-        } else if (progress === -1) {
-            setProgressBar(undefined)
-        } else {
+        const handlerChangeProgressToValue = (progress) => {
             setProgressBar(<Bar progress={progress} width={200} />)
+            notificationInstance.progressNotification(progress)
+        }
+        if (progress === -1) {
+            setProgressBar(undefined)
+            notificationInstance.progressNotification(-1)
+        } else if (infinite) {
+            setProgressBar(<Circle size={30} indeterminate />)
+        }
+        const date = new Date()
+        if (lastProgressBarUpdate !== undefined) {
+            const seconds =
+                Math.abs(lastProgressBarUpdate.getTime() - date.getTime()) /
+                1000
+            console.log(seconds)
+
+            if (seconds < 2) {
+                // notify in 3 a 3 seconds
+                return
+            } else {
+                lastProgressBarUpdate = date
+                handlerChangeProgressToValue(progress)
+            }
+        } else {
+            lastProgressBarUpdate = date
+            handlerChangeProgressToValue(progress)
         }
     }
 
@@ -167,6 +194,8 @@ export default function App() {
         // get the intent
         getIntent()
         AppState.addEventListener('change', getIntent)
+        const notification = new Notification()
+        setNotificationInstance(notification)
     }, [])
 
     return (
