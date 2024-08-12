@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ</title>
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <script src="../js/bootstrap.bundle.min.js" defer></script>
+    <script src="../js/dark-mode.js" defer></script>
+</head>
+<body>
+    <noscript>Enable Javascript to use this site!</noscript>
+    <main class="container mt-4 text-center">
+        <h1>FAQ</h1>
+        <div class="accordion mt-4" id="faq">
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="question1">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#response1" aria-expanded="false" aria-controls="response1">
+                  O aplicativo possui algum tipo de vírus?
+                </button>
+              </h2>
+              <div id="response1" class="accordion-collapse collapse" aria-labelledby="question1" data-bs-parent="#faq">
+                <div class="accordion-body">
+                  Não, o aplicativo não possui nenhum tipo de vírus, ele é um aplicativo de código aberto, desde que o apk seja baixado dentro do site oficial ou dentro das releases do Github oficial, ele irá estar livre de qualquer tipo de vírus.
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="question2">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#response2" aria-expanded="false" aria-controls="response2">
+                  O aplicativo funciona?
+                </button>
+              </h2>
+              <div id="response2" class="accordion-collapse collapse" aria-labelledby="question2" data-bs-parent="#faq">
+                <div class="accordion-body">
+                  Sim, desde que a biblioteca principal esteja funcionando, caso ela acabe por quebrar e parar de funcionar, normalmente dentro de 1 a 3 dias ele irá ser consertado e você será notificado que existe uma nova versão do aplicativo, essa nova versão poderá ser uma atualização de fix (atualizações que consertam erros da aplicação) ou uma feature (atualizações que trazem novos recursos).
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="question3">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#response3" aria-expanded="false" aria-controls="response3">
+                  O aplicativo é compatível com quais plataformas?
+                </button>
+              </h2>
+              <div id="response3" class="accordion-collapse collapse" aria-labelledby="question3" data-bs-parent="#faq">
+                <div class="accordion-body">
+                  Somente com Android.
+                </div>
+              </div>
+            </div>
+          </div>          
+    </main>
+    <button class="btn btn-primary ms-4 mt-4" onclick="history.go(-1)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left-circle-fill" viewBox="0 0 16 16">
+            <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm3.5 7.5a.5.5 0 0 1 0 1H5.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L5.707 7.5H11.5z"/>
+        </svg>
+    </button>
+</body>
+</html>
