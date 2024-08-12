@@ -126,7 +126,8 @@ export default function App() {
         progress: number,
         infinite: boolean = false
     ) => {
-        const handlerChangeProgressToValue = (progress) => {
+        const handlerChangeProgressToValue = (progress, date) => {
+            lastProgressBarUpdate = date
             setProgressBar(<Bar progress={progress} width={200} />)
             notificationInstance.progressNotification(progress)
         }
@@ -141,18 +142,15 @@ export default function App() {
             const seconds =
                 Math.abs(lastProgressBarUpdate.getTime() - date.getTime()) /
                 1000
-            console.log(seconds)
 
             if (seconds < 2) {
-                // notify in 3 a 3 seconds
+                // change in 2 a 2 seconds
                 return
             } else {
-                lastProgressBarUpdate = date
-                handlerChangeProgressToValue(progress)
+                handlerChangeProgressToValue(progress, date)
             }
         } else {
-            lastProgressBarUpdate = date
-            handlerChangeProgressToValue(progress)
+            handlerChangeProgressToValue(progress, date)
         }
     }
 

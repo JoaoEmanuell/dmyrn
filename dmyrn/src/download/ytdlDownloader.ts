@@ -255,11 +255,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
 
     private filterFormat = (data: ytdlObjectFormats[]): ytdlObjectFormats => {
         let toReturn
-        console.log(`formats`)
-
         data.forEach((video) => {
-            console.log(video.itag)
-
             if (video.itag === this.quality) {
                 toReturn = video
                 return video
