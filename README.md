@@ -1,5 +1,6 @@
 - [Dmyrn](#dmyrn)
   - [Features](#features)
+  - [Download](#download)
   - [Running Locally](#running-locally)
   - [Deployment](#deployment)
   - [Tech Stack](#tech-stack)
@@ -19,6 +20,10 @@ Dmyrn (Download Music YouTube React Native) is an Android application designed t
 - Saving files to the device's internal memory.
 - Notifications.
 - Background operation.
+
+## Download
+
+Access the [site](https://joaoemanuell.github.io/dmyrn/html/download.html) to download the apk, or access the [releases](https://github.com/JoaoEmanuell/dmyrn/releases)
 
 ## Running Locally
 
