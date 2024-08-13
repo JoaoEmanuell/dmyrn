@@ -1,1 +1,1 @@
-export const version = '9f23c010-b040-4cf3-8e3d-23fc1775fe25'
+export const version = '23a135b8-9bf2-4dce-9ddf-3b341a0c5a56'
