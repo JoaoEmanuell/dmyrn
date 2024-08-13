@@ -11,6 +11,10 @@
 
 Dmyrn (Download Music YouTube React Native) é uma aplicação Android cujo propósito é permitir que o usuário faça o download de vídeos e músicas do YouTube de forma gratuita.
 
+<p align="center">
+  <img src="./docs/images/icon.png" alt="icon" width="100px"/>
+</p>
+
 ## Funcionalidades
 
 - Download de vídeos e playlists.
