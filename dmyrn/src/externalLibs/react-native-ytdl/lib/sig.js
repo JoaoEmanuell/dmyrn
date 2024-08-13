@@ -1,4 +1,3 @@
-const URL = require("./__REACT_NATIVE_YTDL_CUSTOM_MODULES__/url").URL;
 const querystring = require('querystring');
 const Cache = require('./cache');
 const utils = require('./utils');
@@ -6,6 +5,55 @@ const { Logger } = require("../../../utils/log");
 
 // A shared cache to keep track of html5player js functions.
 exports.cache = new Cache();
+
+// distube sig
+
+const matchRegex = (regex, str) => {
+  // (`match: ${regex}`)
+const match = str.match(new RegExp(regex, 's'));
+if (!match) throw new Error(`Could not match ${regex}`);
+return match;
+};
+
+const matchGroup1 = (regex, str) => matchRegex(regex, str)[1];
+
+const N_ARGUMENT=" ncode"
+const SCVR = '[a-zA-Z0-9$_]';
+const FNR = `${SCVR}+`;
+const AAR = '\\[(\\d+)]';
+const N_TRANSFORM_NAME_REGEXPS = [
+  // NewPipeExtractor regexps
+  `${SCVR}+="nn"\\[\\+${
+    SCVR}+\\.${SCVR}+],${
+    SCVR}+=${SCVR
+  }+\\.get\\(${SCVR}+\\)\\)&&\\(${
+    SCVR}+=(${SCVR
+  }+)\\[(\\d+)]`,
+  `${SCVR}+="nn"\\[\\+${
+    SCVR}+\\.${SCVR}+],${
+    SCVR}+=${SCVR}+\\.get\\(${
+    SCVR}+\\)\\).+\\|\\|(${SCVR
+  }+)\\(""\\)`,
+  `\\(${SCVR}=String\\.fromCharCode\\(110\\),${
+    SCVR}=${SCVR}\\.get\\(${
+    SCVR}\\)\\)&&\\(${SCVR
+  }=(${FNR})(?:${AAR})?\\(${
+    SCVR}\\)`,
+  `\\.get\\("n"\\)\\)&&\\(${SCVR
+  }=(${FNR})(?:${AAR})?\\(${
+    SCVR}\\)`,
+  // Skick regexps
+  '(\\w+).length\\|\\|\\w+\\(""\\)',
+  '\\w+.length\\|\\|(\\w+)\\(""\\)',
+];
+
+// LavaPlayer regexps
+const N_TRANSFORM_REGEXP = 'function\\(\\s*(\\w+)\\s*\\)\\s*\\{' +
+  'var\\s*(\\w+)=(?:\\1\\.split\\(""\\)|String\\.prototype\\.split\\.call\\(\\1,""\\)),' +
+  '\\s*(\\w+)=(\\[.*?]);\\s*\\3\\[\\d+]' +
+  '(.*?try)(\\{.*?})catch\\(\\s*(\\w+)\\s*\\)\\s*\\' +
+  '{\\s*return"enhanced_except_([A-z0-9-]+)"\\s*\\+\\s*\\1\\s*}' +
+  '\\s*return\\s*(\\2\\.join\\(""\\)|Array\\.prototype\\.join\\.call\\(\\2,""\\))};';
 
 /**
  * Extract signature deciphering and n parameter transform functions from html5player file.
@@ -23,6 +71,26 @@ exports.getFunctions = (html5playerfile, options) => exports.cache.getOrSet(html
   exports.cache.set(html5playerfile, functions);
   return functions;
 });
+
+const getFuncName = (body, regexps) => {
+  // adapted from distube
+  let fn;
+  for (const regex of regexps) {
+    try {
+      fn = matchGroup1(regex, body);
+      try {
+        fn = matchGroup1(`${fn.replace(/\$/g, '\\$')}=\\[([a-zA-Z0-9$\\[\\]]{2,})\\]`, body);
+      } catch (err) {
+        // Function name is not inside an array
+      }
+      break;
+    } catch (err) {
+      continue;
+    }
+  }
+  if (!fn || fn.includes('[')) throw Error();
+  return fn;
+};
 
 /**
  * Extracts the actions that should be taken to decipher a signature
@@ -56,28 +124,15 @@ exports.extractFunctions = body => {
     }
   };
   const extractNCode = () => {
-    // adapted from https://github.com/fent/node-ytdl-core/issues/1301#issuecomment-2265135782
-    const alphanum = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTVUWXYZ.$_0123456789';
-    let functionName = '';
-    let clue = body.indexOf('enhanced_except');
-    if (clue < 0) clue = body.indexOf('String.prototype.split.call(a,"")');
-    if (clue < 0) clue = body.indexOf('Array.prototype.join.call(b,"")');
-    if (clue > 0) {
-        let nstart = body.lastIndexOf('=function(a){', clue) - 1;
-        while (nstart && alphanum.includes(body.charAt(nstart))) {
-	    functionName = body.charAt(nstart) + functionName;
-	    nstart--;
-        }
-    }
-    if (functionName && functionName.length) {
-      const functionStart = `${functionName}=function(a)`;
-      const ndx = body.indexOf(functionStart);
-      if (ndx >= 0) {
-        const subBody = body.slice(ndx + functionStart.length);
-        const functionBody = `var ${functionStart}${utils.cutAfterJS(subBody)};return ${functionName}(ncode);`;
-        functions.push(functionBody)
-      }
-    }
+    // adapted from distube
+    const nFuncName = getFuncName(body, N_TRANSFORM_NAME_REGEXPS);
+      const funcPattern = `(${
+        nFuncName.replace(/\$/g, '\\$')
+      // eslint-disable-next-line max-len
+      }=\\s*function([\\S\\s]*?\\}\\s*return (([\\w$]+?\\.join\\(""\\))|(Array\\.prototype\\.join\\.call\\([\\w$]+?,[\\n\\s]*(("")|(\\("",""\\)))\\)))\\s*\\}))`;
+      const nTransformFunc = `var ${matchGroup1(funcPattern, body)};`;
+      const callerFunc = `return ${nFuncName}(${N_ARGUMENT});`;
+      functions.push(`${nTransformFunc}${callerFunc}`)
   };
   extractDecipher();
   extractNCode();
@@ -132,19 +187,15 @@ exports.setDownloadURL = (format, decipherScript, nTransformScript) => {
 exports.decipherFormats = async(formats, html5player, options) => {
   let decipheredFormats = {};
   let functions = await exports.getFunctions(html5player, options);
-  // get the functions and transform in a javascript function, modified the html5player functions to add a return for main function in code.
-  const decipherScript = functions.length ? new Function('sig', functions[0]) : null;
-  const nTransformScript = functions.length > 1 ? new Function('ncode', functions[1]) : null;
-
-  if (__DEV__) {
-    // used to update the scripts
-    Logger.debug("Sig scripts: ");
-    Logger.debug("decipherScript");
-    Logger.debug(decipherScript ? 'Decipher extraction work with success' : 'erro to extract decipher script');
-    Logger.debug("nTransformScript");
-    Logger.debug(nTransformScript ? 'nTransform extraction work with success' : 'erro to extract nTransform script');
+  let decipherScript, nTransformScript;
+  try {
+    decipherScript = functions.length ? new Function('sig', functions[0]) : null;
+    nTransformScript = functions.length > 1 ? new Function('ncode', functions[1]) : null;
+  } catch (err) {
+    Logger.error(`Sig.js, error to extract the functions: ${err}\n${functions}`)
+    throw "Error to extract the functions"
   }
-  
+
   formats.forEach(format => {
     exports.setDownloadURL(format, decipherScript, nTransformScript);
     decipheredFormats[format.url] = format;

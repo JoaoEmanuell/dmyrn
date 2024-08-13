@@ -170,8 +170,19 @@ export class ytdlDownload implements ytdlDownloadInterface {
         this.output('Coletando informações do vídeo!')
         this.progressBar(0, true)
         Logger.debug(`Quality: ${this.quality}`)
+        let videoExtract: string[]
 
-        const videoExtract = await this.extractUrlToVideo()
+        try {
+            videoExtract = await this.extractUrlToVideo()
+        } catch (err) {
+            this.output(
+                "Erro ao extrair as informações do vídeos, consulte o log (localizado em 'downloads/.dmyrn/' para entender o erro."
+            )
+            this.progressBar(-1, false)
+            Logger.error(
+                `--YtdlDownloader--\nError to extract video info: ${err}`
+            )
+        }
         const title = videoExtract[0]
         const url = videoExtract[1]
         let fileTemporary = videoExtract[2]
