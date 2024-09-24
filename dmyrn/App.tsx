@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react'
-import { ScrollView, TextInput, View, Text, AppState } from 'react-native'
+import {
+    ScrollView,
+    TextInput,
+    View,
+    Text,
+    AppState,
+    Image,
+} from 'react-native'
 import { Bar, Circle } from 'react-native-progress'
 import ReceiveSharingIntent from 'react-native-receive-sharing-intent'
+import {
+    Repeat,
+    ArrowLeft,
+    PlayCircle,
+    ArrowRight,
+    Shuffle,
+    StopCircle,
+} from 'lucide-react-native'
 
 import { UrlValidator } from './src/urlValidator/urlValidator'
 import GrayButton from './components/ui/GrayButton'
@@ -15,10 +30,19 @@ import { Logger } from './src/utils/log'
 import { fileIntent } from './src/interfaces/types'
 import { Notification } from './src/notification/notification'
 import { Updater } from './src/updater/updater'
+import { getYouTubeVideoId } from './src/utils/getYouTubeVideoId'
 
 export default function App() {
     type buttonColor = '' | 'bg-gray-500'
-    const [input, onChangeInput] = useState('')
+    const [input, setInputText] = useState('')
+    const [videoTitle, setVideoTitle] = useState('Video title')
+    const [channelName, setChannelName] = useState('Channel name')
+    const [playButton, setPlayButton] = useState(
+        <PlayCircle color="black" size={32} />
+    )
+    const [thumbUri, setThumbUri] = useState(
+        'https://img.youtube.com/vi/-IDzs6GncUk/sddefault.jpg'
+    )
     const [progressBar, setProgressBar] = useState<JSX.Element | null>(null)
     const [outputText, setOutputText] = useState('')
     const [selectedItem, setSelected] = useState<'360' | '720' | ''>('')
@@ -36,8 +60,8 @@ export default function App() {
     let lastProgressBarUpdate: Date | undefined = undefined
 
     const data = [
-        { key: '360', value: '360p' },
-        { key: '720', value: '720p' },
+        { key: 'audio', value: 'audio' },
+        { key: 'video', value: 'video' },
     ]
 
     /**
@@ -169,6 +193,7 @@ export default function App() {
                 Logger.debug(`receive sharing`)
                 files.map((file) => {
                     if (file.weblink) {
+                        setInputText(file.weblink)
                         onChangeInput(file.weblink)
                     }
                 })
@@ -183,6 +208,13 @@ export default function App() {
                 }
             }
         )
+    }
+
+    const onChangeInput = (url: string = '') => {
+        const inputText = url ? url : input.trim()
+        if (inputText === '') return
+        const videoId = getYouTubeVideoId(inputText)
+        setThumbUri(`https://img.youtube.com/vi/${videoId}/sddefault.jpg`)
     }
 
     useEffect(() => {
@@ -201,51 +233,57 @@ export default function App() {
     }, [])
 
     return (
-        <ScrollView className="bg-white">
-            <View>
+        <ScrollView className="bg-gray-100">
+            <View className="flex items-center mt-4">
                 <TextInput
-                    placeholder="Link do vídeo ou playlist"
-                    placeholderTextColor={'black'}
-                    className="text-center text-black p-4 m-4 bg-gray-200 rounded-lg"
+                    placeholder="Url do YouTube"
+                    placeholderTextColor={'gray'}
+                    className="text-black px-4 m-4 bg-white rounded-full border w-[60%]"
                     value={input}
-                    onChangeText={onChangeInput}
+                    onEndEditing={() => {
+                        onChangeInput()
+                    }}
+                    onChangeText={setInputText}
                 />
             </View>
-            <View
-                style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                }}
-                className="self-center"
-            >
-                <GrayButton
-                    onPress={onPressMp3Button}
-                    text="MP3"
-                    pressableClassName={`w-20 mr-4 ${mp3ButtonColor}`}
-                />
-                {dropdown}
-            </View>
-            <View className="mt-4">
-                <GrayButton
-                    onPress={pressDownloadButton}
-                    text={textDownloadButton}
-                    pressableClassName="mx-12"
-                />
-            </View>
-            <View className="mt-4">
-                <Text className="text-black text-center">{outputText}</Text>
-            </View>
-
-            <View
-                className="mt-4 self-center"
-                style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                }}
-            >
-                {progressBar}
+            <View className="bg-white rounded-lg mx-4">
+                <View className="flex items-center">
+                    <Image
+                        source={{
+                            uri: thumbUri,
+                        }}
+                        width={300}
+                        height={300}
+                        alt="video thumb"
+                        style={{
+                            resizeMode: 'contain',
+                        }}
+                    />
+                </View>
+                <View className="mx-4">
+                    <Text className="text-black">{videoTitle}</Text>
+                    <Text className="text-black font-bold">{channelName}</Text>
+                </View>
+                <View className="my-4 flex-row justify-around">
+                    <Repeat color="black" size={32} />
+                    <ArrowLeft color="black" size={32} />
+                    {playButton}
+                    <ArrowRight color="black" size={32} />
+                    <Shuffle color="black" size={32} />
+                </View>
+                <View className="m-4 px-4">
+                    <Dropdown
+                        setSelected={(val) => setSelected(val)}
+                        data={data}
+                        onSelect={() => {
+                            setFormatSelected('mp4')
+                            setMp3ButtonColor('')
+                        }}
+                        placeholder="Baixar"
+                        search={false}
+                        key={getRandomElementKey()}
+                    />
+                </View>
             </View>
         </ScrollView>
     )
