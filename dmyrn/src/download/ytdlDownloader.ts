@@ -17,7 +17,6 @@ import { Notification } from '../notification/notification'
 export class ytdlDownload implements ytdlDownloadInterface {
     // public properties
     videoUrl: string
-    quality: 140 | 22 | 18
     progressBar: (progress: number, infinite: boolean) => void
     output: (text: string) => void
     messageFinishedDownload: () => void
@@ -33,10 +32,11 @@ export class ytdlDownload implements ytdlDownloadInterface {
     private playlistVideos: string[] // string array withe the videos of the playlist
     private downloadStop: boolean = false // if true, the user clicked in stop download button
     private isPlaylist: boolean = false // if true, the url is a playlist
+    private cache: Array<string | ytdlObjectFormats[]> = null
+    private quality: number = 18
 
     constructor(
         videoUrl: string,
-        quality: 'mp3' | videoFormats,
         progressBar: (progress: number, infinite: boolean) => void,
         output: (text: string) => void,
         messageFinishedDownload: () => void,
@@ -44,35 +44,20 @@ export class ytdlDownload implements ytdlDownloadInterface {
         ffmpeg: Ffmpeg,
         notification: Notification
     ) {
-        const qualityMap = {
-            mp3: 18, // yes, the download of the mp3 is in 360p to accelerate
-            '720': 22,
-            '360': 18,
-        }
-        const saveFormatMap = {
-            mp3: 'm4a',
-            '720': 'mp4',
-            '360': 'mp4',
-        }
         this.videoUrl = videoUrl
-        this.quality = qualityMap[quality]
-        this.saveFormat = saveFormatMap[quality]
         this.progressBar = progressBar
         this.output = output
         this.messageFinishedDownload = messageFinishedDownload
         this.playlistExtractor = playlistExtractor
         this.ffmpeg = ffmpeg
         this.notification = notification
-        this.contentType = 'video'
-        if (this.saveFormat === 'm4a') {
-            this.contentType = 'audio'
-        }
         if (videoUrl.includes('?list=')) {
             this.isPlaylist = true
         }
     }
 
-    async download() {
+    async download(format: 'video' | 'audio') {
+        this.configVideoInfo(format)
         if (this.isPlaylist) {
             // download playlist
             await this.playlistDownload()
@@ -100,7 +85,20 @@ export class ytdlDownload implements ytdlDownloadInterface {
      * extract the url to video, case the format is not available return a empty, and cancel the execution
      * @returns [title, url, filename with path to temporary file (saved in cache dir)]
      */
-    private extractUrlToVideo = async () => {
+    private extractUrlToVideo = async (
+        all = false
+    ): Promise<string[] | Array<string | ytdlObjectFormats[]>> => {
+        if (this.cache) {
+            const format = this.filterFormat(
+                (this.cache as unknown as ytdlInfoType).formats
+            )
+            const fileTemporary = `${cacheDir}/${secureFilename(
+                this.cache[0] as string
+            )}.${this.saveFormat}`
+
+            return [this.cache[0], format.url, fileTemporary]
+        }
+
         const id = await ytdl.getVideoID(this.videoUrl)
         const info = (await ytdl.getInfo(id, {})) as ytdlInfoType
         const format = this.filterFormat(info.formats)
@@ -119,7 +117,10 @@ export class ytdlDownload implements ytdlDownloadInterface {
             this.saveFormat
         }`
 
-        return [title, url, fileTemporary]
+        if (!all) {
+            return [title, url, fileTemporary]
+        }
+        return [title, info.videoDetails.author.name, info.formats]
     }
 
     /**
@@ -149,6 +150,11 @@ export class ytdlDownload implements ytdlDownloadInterface {
         })
             .promise.then((response) => {
                 Logger.debug('File downloaded!', response)
+                if (response.statusCode === 403) {
+                    Logger.error('Download error')
+                    this.output('Erro no download')
+                    throw 'Error to download the content'
+                }
                 this.progressBar(-1, false)
             })
             .catch((err) => {
@@ -173,7 +179,7 @@ export class ytdlDownload implements ytdlDownloadInterface {
         let videoExtract: string[]
 
         try {
-            videoExtract = await this.extractUrlToVideo()
+            videoExtract = (await this.extractUrlToVideo()) as string[]
         } catch (err) {
             this.output(
                 "Erro ao extrair as informações do vídeos, consulte o log (localizado em 'downloads/.dmyrn/' para entender o erro."
@@ -297,5 +303,18 @@ export class ytdlDownload implements ytdlDownloadInterface {
         this.videoUrl = this.playlistVideos[0]
         this.playlistVideos.shift()
         await this.baseDownloader()
+    }
+
+    async getInfo(): Promise<Array<string | ytdlObjectFormats[]>> {
+        return await this.extractUrlToVideo(true)
+    }
+
+    private configVideoInfo = (format: 'audio' | 'video') => {
+        const saveFormatMap = {
+            audio: 'm4a',
+            video: 'mp4',
+        }
+        this.saveFormat = saveFormatMap[format] as 'm4a' | 'mp4'
+        this.contentType = format
     }
 }

@@ -1,11 +1,10 @@
 import { PlaylistExtractor } from '../download/playlistExtractor'
 import { Ffmpeg } from '../ffmpeg/ffmpeg'
-import { outputType, progressBarType } from './types'
+import { outputType, progressBarType, ytdlObjectFormats } from './types'
 import { Notification } from '../notification/notification'
 
 export interface ytdlDownloadInterface {
     videoUrl: string
-    quality: 140 | 22 | 18
     playlistExtractor: PlaylistExtractor
     ffmpeg: Ffmpeg
     notification: Notification
@@ -14,12 +13,14 @@ export interface ytdlDownloadInterface {
     messageFinishedDownload(): void
     /**
      * download the content
+     * @param itag itag for video
      * @returns promise with a boolean on end the execution
      */
-    download: () => Promise<Boolean>
+    download: (format: 'audio' | 'video') => Promise<Boolean>
     /**
      * cancel the download, and conversion.
      * @returns void
      */
     cancel: () => {}
+    getInfo(): Promise<Array<string | ytdlObjectFormats[]>>
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
     ScrollView,
     TextInput,
@@ -6,6 +6,7 @@ import {
     Text,
     AppState,
     Image,
+    Alert,
 } from 'react-native'
 import { Bar, Circle } from 'react-native-progress'
 import ReceiveSharingIntent from 'react-native-receive-sharing-intent'
@@ -15,8 +16,9 @@ import {
     PlayCircle,
     ArrowRight,
     Shuffle,
-    StopCircle,
 } from 'lucide-react-native'
+import YoutubePlayer from 'react-native-youtube-iframe'
+import { getYoutubeMeta } from 'react-native-youtube-iframe'
 
 import { UrlValidator } from './src/urlValidator/urlValidator'
 import GrayButton from './components/ui/GrayButton'
@@ -27,28 +29,24 @@ import { requestAndroidPermissions } from './src/lib/androidPermissions'
 import { PlaylistExtractor } from './src/download/playlistExtractor'
 import { Ffmpeg } from './src/ffmpeg/ffmpeg'
 import { Logger } from './src/utils/log'
-import { fileIntent } from './src/interfaces/types'
+import { fileIntent, ytdlObjectFormats } from './src/interfaces/types'
 import { Notification } from './src/notification/notification'
 import { Updater } from './src/updater/updater'
 import { getYouTubeVideoId } from './src/utils/getYouTubeVideoId'
 
 export default function App() {
-    type buttonColor = '' | 'bg-gray-500'
-    const [input, setInputText] = useState('')
+    const [input, setInputText] = useState(
+        'https://music.youtube.com/watch?v=g4V90JtBTRk&si=whZc5YMvrooS-pPJ'
+    )
     const [videoTitle, setVideoTitle] = useState('Video title')
     const [channelName, setChannelName] = useState('Channel name')
     const [playButton, setPlayButton] = useState(
         <PlayCircle color="black" size={32} />
     )
-    const [thumbUri, setThumbUri] = useState(
-        'https://img.youtube.com/vi/-IDzs6GncUk/sddefault.jpg'
-    )
+    const [thumbUri, setThumbUri] = useState('')
     const [progressBar, setProgressBar] = useState<JSX.Element | null>(null)
     const [outputText, setOutputText] = useState('')
-    const [selectedItem, setSelected] = useState<'360' | '720' | ''>('')
-    const [formatSelected, setFormatSelected] = useState<'mp3' | 'mp4'>('mp3')
     const [dropdown, setDropdown] = useState<JSX.Element | null>(null)
-    const [mp3ButtonColor, setMp3ButtonColor] = useState<buttonColor>('')
     const [downloadStatus, setDownloadStatus] = useState(true) // if true download is allowed, else stop the download
     const [textDownloadButton, setTextDownloadButton] = useState<
         'Baixar música ou playlist' | 'Parar download'
@@ -57,11 +55,29 @@ export default function App() {
     const [notificationInstance, setNotificationInstance] = useState<
         undefined | Notification
     >()
+    const [selectedQuality, setSelectedQuality] = useState<'audio' | 'video'>(
+        'audio'
+    )
+    const [videoLoad, setVideoLoad] = useState(false)
+    const [playing, setPlaying] = useState(false)
+    const [videoId, setVideoId] = useState('72W2owLvMek')
+
+    const onStateChange = useCallback((state) => {
+        if (state === 'ended') {
+            setPlaying(false)
+            Alert.alert('video has finished playing!')
+        }
+    }, [])
+
+    const togglePlaying = useCallback(() => {
+        setPlaying((prev) => !prev)
+    }, [])
+
     let lastProgressBarUpdate: Date | undefined = undefined
 
     const data = [
         { key: 'audio', value: 'audio' },
-        { key: 'video', value: 'video' },
+        { key: 'video', value: 'video (360p)' },
     ]
 
     /**
@@ -80,43 +96,32 @@ export default function App() {
         }
 
         const urlValidator = UrlValidator(input)
+        console.log(urlValidator)
 
         if (urlValidator.status) {
             if (downloadStatus) {
-                let selectedQuality
-                if (formatSelected === 'mp3') {
-                    selectedQuality = formatSelected
+                if (ytdlInstance) {
+                    setDownloadStatus(false)
+                    setTextDownloadButton('Parar download')
+                    await ytdlInstance.download(selectedQuality)
                 } else {
-                    selectedQuality = selectedItem
+                    setYtdlInstance(
+                        new ytdlDownload(
+                            input,
+                            setProgressBarValue,
+                            setOutputText,
+                            messageFinishedDownload,
+                            new PlaylistExtractor(),
+                            new Ffmpeg(),
+                            notificationInstance
+                        )
+                    )
+                    await pressDownloadButton()
                 }
-                const ytdlDownloadInstance = new ytdlDownload(
-                    input,
-                    selectedQuality,
-                    setProgressBarValue,
-                    setOutputText,
-                    messageFinishedDownload,
-                    new PlaylistExtractor(),
-                    new Ffmpeg(),
-                    notificationInstance
-                )
-                setYtdlInstance(ytdlDownloadInstance)
-                setDownloadStatus(false)
-                setTextDownloadButton('Parar download')
-                await ytdlDownloadInstance.download()
             }
         } else {
             setOutputText('Url inválida!')
         }
-    }
-
-    /**
-     * reset dropdown, change the mp3 button color, and set the format to mp3
-     */
-
-    const onPressMp3Button = () => {
-        setFormatSelected('mp3')
-        setDropdown(getDropdown)
-        setMp3ButtonColor('bg-gray-500')
     }
 
     /**
@@ -127,13 +132,12 @@ export default function App() {
     const getDropdown = () => {
         return (
             <Dropdown
-                setSelected={(val) => setSelected(val)}
-                data={data}
-                onSelect={() => {
-                    setFormatSelected('mp4')
-                    setMp3ButtonColor('')
+                setSelected={(val: 'video' | 'audio') => {
+                    setSelectedQuality(val)
                 }}
-                placeholder="MP4"
+                data={data}
+                onSelect={() => {}}
+                placeholder="Baixar"
                 search={false}
                 key={getRandomElementKey()}
             />
@@ -210,11 +214,23 @@ export default function App() {
         )
     }
 
-    const onChangeInput = (url: string = '') => {
+    const onChangeInput = async (url: string = '') => {
         const inputText = url ? url : input.trim()
         if (inputText === '') return
+        const urlValidator = UrlValidator(inputText)
+        if (!urlValidator.status) {
+            setOutputText('Url inválida')
+            return
+        }
+
+        // set the video infos
+
         const videoId = getYouTubeVideoId(inputText)
-        setThumbUri(`https://img.youtube.com/vi/${videoId}/sddefault.jpg`)
+        setVideoId(videoId)
+        const data = await getYoutubeMeta(videoId)
+        setVideoTitle(data.title)
+        setChannelName(data.author_name)
+        setVideoLoad(true)
     }
 
     useEffect(() => {
@@ -247,17 +263,16 @@ export default function App() {
                 />
             </View>
             <View className="bg-white rounded-lg mx-4">
-                <View className="flex items-center">
-                    <Image
-                        source={{
-                            uri: thumbUri,
-                        }}
-                        width={300}
+                <View className="m-4 max-h-[170px]">
+                    <YoutubePlayer
                         height={300}
-                        alt="video thumb"
-                        style={{
-                            resizeMode: 'contain',
+                        play={playing}
+                        videoId={videoId}
+                        onChangeState={onStateChange}
+                        onError={(err) => {
+                            console.error(`error in youtube player: ${err}`)
                         }}
+                        onReady={() => console.log('iframe read')}
                     />
                 </View>
                 <View className="mx-4">
@@ -271,18 +286,14 @@ export default function App() {
                     <ArrowRight color="black" size={32} />
                     <Shuffle color="black" size={32} />
                 </View>
+                <View className="m-4 px-4">{dropdown}</View>
                 <View className="m-4 px-4">
-                    <Dropdown
-                        setSelected={(val) => setSelected(val)}
-                        data={data}
-                        onSelect={() => {
-                            setFormatSelected('mp4')
-                            setMp3ButtonColor('')
-                        }}
-                        placeholder="Baixar"
-                        search={false}
-                        key={getRandomElementKey()}
-                    />
+                    {videoLoad && (
+                        <GrayButton
+                            text={textDownloadButton}
+                            onPress={pressDownloadButton}
+                        />
+                    )}
                 </View>
             </View>
         </ScrollView>
